@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<link rel="manifest" href="manifest.json">
+<title>Money Tracker</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: #0f172a;
+    color: #e2e8f0;
+    padding: 16px 12px 32px;
+  }
+  .wrap { max-width: 560px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 4px 0 16px; }
+  h2 { font-size: 15px; margin: 0 0 10px; color: #94a3b8; font-weight: 600; }
+  h3 { margin: 0 0 12px; font-size: 16px; }
+  .card { background: #1e293b; border-radius: 14px; padding: 16px; margin-bottom: 14px; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center; }
+  .stat .lbl { font-size: 12px; color: #94a3b8; }
+  .stat .val { font-size: 17px; font-weight: 700; margin-top: 4px; word-break: break-word; }
+  .in { color: #34d399; }
+  .out { color: #f87171; }
+  .net-box { margin-top: 14px; padding: 12px; border-radius: 12px; text-align: center; background: #0f172a; }
+  .net-box .lbl { font-size: 13px; color: #94a3b8; }
+  .net-box .big { font-size: 26px; font-weight: 800; margin-top: 4px; }
+  form { display: grid; gap: 10px; grid-template-columns: 1fr 1fr; }
+  .full { grid-column: 1 / -1; }
+  .seg { display: grid; grid-template-columns: 1fr 1fr; border-radius: 10px; overflow: hidden; border: 1px solid #334155; }
+  .seg label { text-align: center; padding: 11px; cursor: pointer; background: #0f172a; color: #94a3b8; font-weight: 600; }
+  .seg input { display: none; }
+  .seg label:has(input:checked) { background: #334155; color: #fff; }
+  .seg label.lin:has(input:checked) { background: #065f46; }
+  .seg label.lout:has(input:checked) { background: #7f1d1d; }
+  input, select, button {
+    font: inherit; border-radius: 10px; border: 1px solid #334155;
+    background: #0f172a; color: #e2e8f0; padding: 11px 12px; width: 100%;
+  }
+  input:focus, select:focus { outline: 2px solid #34d399; border-color: transparent; }
+  button { background: #10b981; color: #052e1c; font-weight: 700; border: none; cursor: pointer; }
+  button:active { transform: scale(0.98); }
+  button.secondary { background: #334155; color: #e2e8f0; }
+  button.danger { background: #ef4444; color: #fff; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+  .row select { width: auto; }
+  .chart-wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  canvas { max-width: 100%; height: auto; }
+  #legend { width: 100%; font-size: 14px; }
+  .leg { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+  .dot { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+  .leg .name { flex: 1; }
+  .leg .pct { color: #94a3b8; }
+  ul { list-style: none; padding: 0; margin: 0; }
+  li { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #334155; }
+  li:last-child { border-bottom: none; }
+  .li-info { flex: 1; min-width: 0; }
+  .li-cat { font-weight: 600; }
+  .li-note { color: #94a3b8; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .li-date { color: #64748b; font-size: 12px; }
+  .li-amt { font-weight: 700; white-space: nowrap; }
+  .del { width: auto; padding: 6px 10px; background: #334155; color: #fca5a5; font-weight: 400; }
+  .empty { color: #64748b; text-align: center; padding: 20px 0; }
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .hint { font-size: 12px; color: #64748b; margin-top: 8px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>💼 Money Tracker</h1>
+
+  <div class="card">
+    <h2>📅 Aaj (<span id="todayLabel"></span>)</h2>
+    <div class="stats">
+      <div class="stat"><div class="lbl">Aaya</div><div class="val in" id="tIn">₹0</div></div>
+      <div class="stat"><div class="lbl">Gaya</div><div class="val out" id="tOut">₹0</div></div>
+      <div class="stat"><div class="lbl">Aaj ka net</div><div class="val" id="tNet">₹0</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <form id="form">
+      <div class="seg full">
+        <label class="lin"><input type="radio" name="type" value="in"><span>+ Aaya (Income)</span></label>
+        <label class="lout"><input type="radio" name="type" value="out" checked><span>− Gaya (Kharcha)</span></label>
+      </div>
+      <input type="number" id="amount" placeholder="Rakam (₹)" min="1" step="any" required>
+      <input type="date" id="date" required>
+      <select id="category" class="full"></select>
+      <input type="text" id="note" class="full" placeholder="Kis cheez pe? (optional)" maxlength="60">
+      <button type="submit" class="full">Add karo</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <h3>📊 Mahine ka hisaab</h3>
+      <select id="filterMonth" aria-label="Mahina chuno"></select>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="lbl">Total aaya</div><div class="val in" id="mIn">₹0</div></div>
+      <div class="stat"><div class="lbl">Total gaya</div><div class="val out" id="mOut">₹0</div></div>
+      <div class="stat"><div class="lbl">Balance</div><div class="val" id="mBal">₹0</div></div>
+    </div>
+    <div class="net-box" id="netBox">
+      <div class="lbl" id="netLabel">Net</div>
+      <div class="big" id="netBig">₹0</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Kahan gaya paisa</h3>
+    <div class="chart-wrap">
+      <canvas id="pie" width="260" height="260"></canvas>
+      <div id="legend"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>History</h3>
+    <ul id="list"></ul>
+    <div class="actions">
+      <button class="secondary" id="exportBtn">CSV export</button>
+      <button class="danger" id="clearBtn">Sab delete</button>
+    </div>
+    <div class="hint">Data sirf is phone ke browser mein save hota hai. Time-to-time CSV export kar lena.</div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const KEY = "money_tracker_v2";
+  const CATS = {
+    out: ["Khana", "Travel", "Shopping", "Bills", "Recharge", "Entertainment", "Other"],
+    in: ["Salary", "Business", "Gift", "Other"]
+  };
+  const COLORS = {
+    Khana: "#f59e0b", Travel: "#3b82f6", Shopping: "#ec4899", Bills: "#ef4444",
+    Recharge: "#8b5cf6", Entertainment: "#10b981", Other: "#64748b",
+    Salary: "#34d399", Business: "#22d3ee", Gift: "#a3e635"
+  };
+
+  const $ = (id) => document.getElementById(id);
+  let items = load();
+
+  function load() {
+    try {
+      const data = JSON.parse(localStorage.getItem(KEY));
+      return Array.isArray(data) ? data : [];
+    } catch (e) { return []; }
+  }
+
+  function save() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(items));
+    } catch (e) {
+      alert("Data save nahi ho paya. Browser storage check karo.");
+    }
+  }
+
+  function localDate(d = new Date()) {
+    const off = d.getTimezoneOffset() * 60000;
+    return new Date(d - off).toISOString().slice(0, 10);
+  }
+
+  function fmt(n) {
+    return "₹" + Number(n).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+  }
+
+  function monthLabel(ym) {
+    const [y, m] = ym.split("-");
+    const names = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return names[Number(m) - 1] + " " + y;
+  }
+
+  function sumOf(list, type) {
+    return list.filter((i) => i.type === type).reduce((s, i) => s + i.amount, 0);
+  }
+
+  function setNet(el, value) {
+    el.textContent = fmt(Math.abs(value));
+    el.className = value >= 0 ? "val in" : "val out";
+  }
+
+  function fillCategories() {
+    const type = document.querySelector('input[name="type"]:checked').value;
+    const sel = $("category");
+    sel.innerHTML = "";
+    CATS[type].forEach((c) => {
+      const opt = document.createElement("option");
+      opt.value = c;
+      opt.textContent = c;
+      sel.appendChild(opt);
+    });
+  }
+
+  function monthsList() {
+    const set = new Set(items.map((i) => i.date.slice(0, 7)));
+    set.add(localDate().slice(0, 7));
+    return [...set].sort().reverse();
+  }
+
+  function fillMonthSelect(keep) {
+    const sel = $("filterMonth");
+    const months = monthsList();
+    sel.innerHTML = "";
+    months.forEach((m) => {
+      const opt = document.createElement("option");
+      opt.value = m;
+      opt.textContent = monthLabel(m);
+      sel.appendChild(opt);
+    });
+    sel.value = months.includes(keep) ? keep : months[0];
+  }
+
+  function renderToday() {
+    const today = localDate();
+    $("todayLabel").textContent = today;
+    const list = items.filter((i) => i.date === today);
+    const inAmt = sumOf(list, "in");
+    const outAmt = sumOf(list, "out");
+    $("tIn").textContent = fmt(inAmt);
+    $("tOut").textContent = fmt(outAmt);
+    setNet($("tNet"), inAmt - outAmt);
+  }
+
+  function renderMonth() {
+    const month = $("filterMonth").value;
+    const list = items.filter((i) => i.date.startsWith(month));
+    const inAmt = sumOf(list, "in");
+    const outAmt = sumOf(list, "out");
+    const net = inAmt - outAmt;
+
+    $("mIn").textContent = fmt(inAmt);
+    $("mOut").textContent = fmt(outAmt);
+    setNet($("mBal"), net);
+
+    const big = $("netBig");
+    $("netLabel").textContent = monthLabel(month) + " ka " + (net >= 0 ? "PROFIT (bachat)" : "LOSS (nuksaan)");
+    big.textContent = (net >= 0 ? "+" : "-") + fmt(Math.abs(net));
+    big.className = "big " + (net >= 0 ? "in" : "out");
+    $("netBox").style.borderLeft = "4px solid " + (net >= 0 ? "#34d399" : "#f87171");
+
+    renderPie(list, outAmt);
+  }
+
+  function renderHistory() {
+    const month = $("filterMonth").value;
+    const list = items
+      .filter((i) => i.date.startsWith(month))
+      .sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+
+    const ul = $("list");
+    ul.innerHTML = "";
+    if (list.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = "Is mahine koi entry nahi";
+      ul.appendChild(empty);
+      return;
+    }
+
+    list.forEach((i) => {
+      const li = document.createElement("li");
+
+      const info = document.createElement("div");
+      info.className = "li-info";
+      const cat = document.createElement("div");
+      cat.className = "li-cat";
+      cat.textContent = (i.type === "in" ? "+ " : "− ") + i.category;
+      const note = document.createElement("div");
+      note.className = "li-note";
+      note.textContent = i.note || "-";
+      const date = document.createElement("div");
+      date.className = "li-date";
+      date.textContent = i.date;
+      info.append(cat, note, date);
+
+      const amt = document.createElement("div");
+      amt.className = "li-amt " + (i.type === "in" ? "in" : "out");
+      amt.textContent = (i.type === "in" ? "+" : "-") + fmt(i.amount);
+
+      const del = document.createElement("button");
+      del.className = "del";
+      del.textContent = "✕";
+      del.title = "Delete";
+      del.addEventListener("click", () => {
+        if (confirm("Ye entry delete karni hai?")) {
+          items = items.filter((x) => x.id !== i.id);
+          save();
+          refresh();
+        }
+      });
+
+      li.append(info, amt, del);
+      ul.appendChild(li);
+    });
+  }
+
+  function renderPie(list, totalOut) {
+    const canvas = $("pie");
+    const c = canvas.getContext("2d");
+    const size = canvas.width;
+    const r = size / 2 - 6;
+    c.clearRect(0, 0, size, size);
+
+    const legend = $("legend");
+    legend.innerHTML = "";
+
+    const totals = {};
+    list.filter((i) => i.type === "out").forEach((i) => {
+      totals[i.category] = (totals[i.category] || 0) + i.amount;
+    });
+    const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+
+    if (totalOut <= 0 || entries.length === 0) {
+      c.fillStyle = "#334155";
+      c.beginPath();
+      c.arc(size / 2, size / 2, r, 0, Math.PI * 2);
+      c.fill();
+      c.fillStyle = "#94a3b8";
+      c.font = "15px system-ui, sans-serif";
+      c.textAlign = "center";
+      c.fillText("Koi kharcha nahi", size / 2, size / 2 + 5);
+      return;
+    }
+
+    let start = -Math.PI / 2;
+    entries.forEach(([cat, value]) => {
+      const angle = (value / totalOut) * Math.PI * 2;
+      const color = COLORS[cat] || "#999";
+
+      c.beginPath();
+      c.moveTo(size / 2, size / 2);
+      c.arc(size / 2, size / 2, r, start, start + angle);
+      c.closePath();
+      c.fillStyle = color;
+      c.fill();
+      start += angle;
+
+      const row = document.createElement("div");
+      row.className = "leg";
+      const dot = document.createElement("span");
+      dot.className = "dot";
+      dot.style.background = color;
+      const name = document.createElement("span");
+      name.className = "name";
+      name.textContent = cat + " · " + fmt(value);
+      const pct = document.createElement("span");
+      pct.className = "pct";
+      pct.textContent = ((value / totalOut) * 100).toFixed(1) + "%";
+      row.append(dot, name, pct);
+      legend.appendChild(row);
+    });
+  }
+
+  function refresh() {
+    renderToday();
+    renderMonth();
+    renderHistory();
+  }
+
+  document.querySelectorAll('input[name="type"]').forEach((r) =>
+    r.addEventListener("change", fillCategories)
+  );
+
+  $("form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const amount = parseFloat($("amount").value);
+    if (!(amount > 0)) return;
+
+    const type = document.querySelector('input[name="type"]:checked').value;
+    const date = $("date").value || localDate();
+    items.push({
+      id: Date.now(),
+      type: type,
+      amount: Math.round(amount * 100) / 100,
+      category: $("category").value,
+      note: $("note").value.trim(),
+      date: date
+    });
+    save();
+
+    $("amount").value = "";
+    $("note").value = "";
+    fillMonthSelect(date.slice(0, 7));
+    refresh();
+  });
+
+  $("filterMonth").addEventListener("change", refresh);
+
+  $("exportBtn").addEventListener("click", () => {
+    if (items.length === 0) return alert("Export karne ke liye data nahi hai");
+    const rows = [["Date", "Type", "Category", "Amount", "Note"]];
+    [...items].sort((a, b) => a.date.localeCompare(b.date)).forEach((i) => {
+      rows.push([
+        i.date,
+        i.type === "in" ? "Income" : "Expense",
+        i.category,
+        i.amount,
+        '"' + String(i.note).replace(/"/g, '""') + '"'
+      ]);
+    });
+    const csv = rows.map((r) => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "money_" + localDate() + ".csv";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+
+  $("clearBtn").addEventListener("click", () => {
+    if (items.length && confirm("Sara data delete ho jaayega. Pakka?")) {
+      items = [];
+      save();
+      fillMonthSelect(localDate().slice(0, 7));
+      refresh();
+    }
+  });
+
+  $("date").value = localDate();
+  fillCategories();
+  fillMonthSelect(localDate().slice(0, 7));
+  refresh();
+})();
+</script>
+</body>
+  </html>
